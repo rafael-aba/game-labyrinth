@@ -68,8 +68,6 @@ class Maze:
             image.blit(self.img, constants.ORIGIN)
 
 class Hero:
-    # sprite_idle = (0,290,100,75)
-    # sprite_move = (250,290,100,75)
     length = 118
     sprite_idle = (0,0,length,177)
     sprite_idle = (length,0,length,177)
@@ -80,8 +78,7 @@ class Hero:
     sprite_idle = (3*length,0,length,177)
     sprite_move = (20,20,100,100)
     def __init__(self):
-        # self.size = 10
-        self.size = 100
+        self.size = 15
         self.position = (constants.LENGTH//2 - self.size - 5, 0)
 
         self.img = pygame.image.load('images/hero.jfif')
@@ -97,9 +94,10 @@ class Hero:
         
         self.tick = 0
         self.state = constants.IDLE
-        self.directionX = constants.DOWN
-        self.directionY = constants.IDLE
+        self.direction = constants.DOWN
+        self.moving = False
         self.rotation = 0
+        self.speed = 1
 
         self.vision = (50,50)
     
@@ -113,7 +111,7 @@ class Hero:
         self.Move(maze)
     
     def UpdateParameters(self):
-        if self.directionX == constants.IDLE and self.directionY == constants.IDLE:
+        if self.moving:
             self.state = constants.IDLE
         else:
             self.state = constants.WALK
@@ -122,46 +120,48 @@ class Hero:
         sprite = self.img
 
         # set sprite movement
-        if (self.state is constants.IDLE):
-            if self.directionX == constants.UP:
-                sprite = self.sprites[4]
-            if self.directionX == constants.DOWN:
-                sprite = self.sprites[0]
-                print('got through here 2')
-            if self.directionX == constants.RIGHT:
-                sprite = self.sprites[13]
-            if self.directionX == constants.LEFT:
-                sprite = self.sprites[8]
-            print('got through here')
-
-        if (self.state is constants.WALK):
-            if (self.tick > 15 and self.tick < 29):
-                sprite = sprite.subsurface(self.sprite_idle)
-            else:
-                sprite = sprite.subsurface(self.sprite_move)
+        if self.direction == constants.UP:
+            sprite = self.sprites[4]
+        if self.direction == constants.DOWN:
+            sprite = self.sprites[0]
+        if self.direction == constants.RIGHT:
+            sprite = self.sprites[13]
+        if self.direction == constants.LEFT:
+            sprite = self.sprites[8]
 
         self.sprite = sprite
 
     def Move(self, maze):
-        newPosition = TupleAddition(self.position, (self.directionX, self.directionY))
-        if not self.ProcessColision(maze,newPosition):
-            self.position = newPosition
+        if self.moving:
+            movement = (0,0)
+            if self.direction == constants.RIGHT:
+                movement = TupleAddition(movement,(self.speed,0),-self.speed, self.speed)
+            elif self.direction == constants.LEFT:
+                movement = TupleAddition(movement,(-self.speed,0),-self.speed, self.speed)
+            elif self.direction == constants.UP:
+                movement = TupleAddition(movement,(0,-self.speed),-self.speed, self.speed)
+            elif self.direction == constants.DOWN:
+                movement = TupleAddition(movement,(0,self.speed),-self.speed, self.speed)
+
+            newPosition = TupleAddition(self.position, movement)
+            if not self.ProcessColision(maze,newPosition):
+                self.position = newPosition
 
     def ProcessColision(self, maze, newPosition):
         result = False
-        if self.directionX == constants.RIGHT:
+        if self.direction == constants.RIGHT:
             for i in range(0, self.size):
                 nextPosition = TupleAddition(newPosition, (self.size, i))
                 result = self.CalculateColision(maze, nextPosition, result)
-        if self.directionX == constants.LEFT:
+        if self.direction == constants.LEFT:
             for i in range(0, self.size):
                 nextPosition = TupleAddition(newPosition, (0, i))
                 result = self.CalculateColision(maze, nextPosition, result)
-        if self.directionY == constants.DOWN:
+        if self.direction == constants.DOWN:
             for i in range(0, self.size):
                 nextPosition = TupleAddition(newPosition, (i, self.size))
                 result = self.CalculateColision(maze, nextPosition, result)
-        if self.directionY == constants.UP:
+        if self.direction == constants.UP:
             for i in range(0, self.size):
                 nextPosition = TupleAddition(newPosition, (i, 0))
                 result = self.CalculateColision(maze, nextPosition, result)
@@ -177,24 +177,34 @@ class Hero:
     def ProcessInput(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RIGHT:
-                self.directionX = 1
+                self.moving = True
+                self.direction = constants.RIGHT
             if event.key == pygame.K_LEFT:
-                self.directionX = -1
+                self.moving = True
+                self.direction = constants.LEFT
             if event.key == pygame.K_UP:
-                self.directionY = -1
+                self.moving = True
+                self.direction = constants.UP
             if event.key == pygame.K_DOWN:
-                self.directionY = 1
+                self.moving = True
+                self.direction = constants.DOWN
             if event.key == pygame.K_ESCAPE:
                 return False
         if event.type == pygame.KEYUP:
-            if event.key == pygame.K_RIGHT:
-                self.directionX = 0
-            if event.key == pygame.K_LEFT:
-                self.directionX = 0
-            if event.key == pygame.K_UP:
-                self.directionY = 0
-            if event.key == pygame.K_DOWN:
-                self.directionY = 0
+            self.moving = False
+            keys_pressed = pygame.key.get_pressed()
+            if keys_pressed[pygame.K_RIGHT]:
+                self.moving = True
+                self.direction = constants.RIGHT
+            if keys_pressed[pygame.K_LEFT]:
+                self.moving = True
+                self.direction = constants.LEFT
+            if keys_pressed[pygame.K_UP]:
+                self.moving = True
+                self.direction = constants.UP
+            if keys_pressed[pygame.K_DOWN]:
+                self.moving = True
+                self.direction = constants.DOWN
         return True
         
     def HasWon(self, maze):
