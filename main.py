@@ -81,7 +81,7 @@ class Hero:
         self.size = 15
         self.position = (constants.LENGTH//2 - self.size - 5, 0)
 
-        self.img = pygame.image.load('images/hero.jfif')
+        self.img = pygame.image.load('images/hero_2.jfif')
         dimensions = self.img.get_size()
         self.sprites = []
         for j in range(0,dimensions[1]-dimensions[1]//4,dimensions[1]//4):
@@ -93,6 +93,7 @@ class Hero:
                 self.sprites.append(sprite)
         
         self.tick = 0
+        self.frame = 0
         self.state = constants.IDLE
         self.direction = constants.DOWN
         self.moving = False
@@ -105,7 +106,7 @@ class Hero:
         screen.blit(self.sprite, self.position)
     
     def Update(self, maze):
-        self.tick = self.tick + 1 if self.tick < 59 else 0
+        self.tick = (self.tick + 1) % 60
         self.UpdateParameters()
         self.RotateSprite()
         self.Move(maze)
@@ -118,18 +119,25 @@ class Hero:
 
     def RotateSprite(self):
         sprite = self.img
+        offset = 0
 
         # set sprite movement
+        if self.moving:
+            self.frame = (self.tick//15)  % 4
+        else: 
+            self.frame = 0
         if self.direction == constants.UP:
-            sprite = self.sprites[4]
+            offset = 4
         if self.direction == constants.DOWN:
-            sprite = self.sprites[0]
+            offset = 0
         if self.direction == constants.RIGHT:
-            sprite = self.sprites[13]
+            offset = 12
         if self.direction == constants.LEFT:
-            sprite = self.sprites[8]
+            offset = 8
 
-        self.sprite = sprite
+        print("frame: ", self.frame)
+        print("offset: ", offset)
+        self.sprite = self.sprites[self.frame + offset]
 
     def Move(self, maze):
         if self.moving:
