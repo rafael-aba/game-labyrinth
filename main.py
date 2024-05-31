@@ -30,6 +30,7 @@ class Maze:
     def __init__(self):
         self.img = {}
         self.FetchMaze()
+        self.overlay_img = self.Overlay_maze()
     
     # Fetch map from mazegenerator.net
     def FetchMaze(self):
@@ -46,7 +47,7 @@ class Maze:
             svg = driver.find_element(By.TAG_NAME, "svg")
             driver.save_screenshot("./images/maze.png")
             self.img = pygame.image.load("./images/maze.png")
-            self.img = self.img.subsurface((0, 0, svg.size["width"], svg.size["height"]))
+            self.img = self.img.subsurface((0, 0, 2*svg.size["width"], 2*svg.size["height"]))
             self.img = pygame.transform.scale(self.img, constants.RESOLUTION)
         finally:
             driver.close()
@@ -56,16 +57,47 @@ class Maze:
         pygame.draw.rect(self.img, constants.RED, (constants.RESOLUTION[0]//2 - rectSize - 1, 0, rectSize, rectSize + 5))
         pygame.draw.rect(self.img, constants.BLUE, (constants.RESOLUTION[0]//2 + 2, constants.RESOLUTION[1] - rectSize - 5, rectSize, rectSize + 5))
 
-    def Draw(self, image, game, hero):
-        if game.difficulty == constants.EASY:
-            image.blit(self.img, constants.ORIGIN)
+    def Overlay_maze(self):
+        wall_img = pygame.image.load("./images/wall.png")
+        wall_img.set_colorkey((255,255,255))
+        wall_img = pygame.transform.scale(wall_img, (7,7))
+
+        house = pygame.image.load("./images/house.png")
+        house.set_colorkey((255,255,255))
+        house = pygame.transform.scale(house, (15,15))
+
+        width, height = self.img.get_size()
+        overlay = pygame.Surface((width, height))
+        overlay.fill(constants.LIGHT_GREEN)
+
+        for y in range(height):
+            for x in range(width):
+                if self.img.get_at((x,y)) == (constants.WALL):
+                    overlay.set_at((x, y), constants.DARK_GREEN)
+        
+        overlay.blit(house,(constants.RESOLUTION[0]//2 + 8, constants.RESOLUTION[1]-15))
+
+        return overlay
+
+    def Draw(self, image, game, hero, wolf):
+        maze_with_wolf = self.overlay_img.copy()
+        
+        if game.wolf:
+            wolf.Update(self, hero)
+            wolf.Draw(maze_with_wolf)
+        
         if game.difficulty == constants.NORMAL:
-            image.fill(constants.BLACK)
+            width, height = maze_with_wolf.get_size()
+            visionImage = pygame.Surface((width, height))
+
             visionPosition = TupleAddition(hero.position,TupleNegative(TupleDivideBy2(hero.vision)), 0, constants.LENGTH - hero.vision[0])
-            visionImage = self.img.subsurface((visionPosition, hero.vision))
+            visionImage = maze_with_wolf.subsurface((visionPosition, hero.vision))
+            
+            image.fill(constants.BLACK)
             image.blit(visionImage, visionPosition)
-        if game.difficulty == constants.HARD:
-            image.blit(self.img, constants.ORIGIN)
+        else:
+            image.blit(maze_with_wolf, constants.ORIGIN)
+
 
 class Hero:
     length = 118
@@ -83,6 +115,7 @@ class Hero:
 
         self.img = pygame.image.load('images/hero_2.jfif')
         dimensions = self.img.get_size()
+        self.sprite = {}
         self.sprites = []
         for j in range(0,dimensions[1]-dimensions[1]//4,dimensions[1]//4):
             for i in range(0,dimensions[0]-dimensions[0]//4,dimensions[0]//4):
@@ -97,7 +130,6 @@ class Hero:
         self.state = constants.IDLE
         self.direction = constants.DOWN
         self.moving = False
-        self.rotation = 0
         self.speed = 1
 
         self.vision = (50,50)
@@ -118,10 +150,8 @@ class Hero:
             self.state = constants.WALK
 
     def RotateSprite(self):
-        sprite = self.img
         offset = 0
 
-        # set sprite movement
         if self.moving:
             self.frame = (self.tick//15)  % 4
         else: 
@@ -134,9 +164,6 @@ class Hero:
             offset = 12
         if self.direction == constants.LEFT:
             offset = 8
-
-        print("frame: ", self.frame)
-        print("offset: ", offset)
         self.sprite = self.sprites[self.frame + offset]
 
     def Move(self, maze):
@@ -217,7 +244,136 @@ class Hero:
         
     def HasWon(self, maze):
         return maze.img.get_at(self.position) == constants.EXIT
+
+class Wolf:
+    length = 118
+    sprite_idle = (0,0,length,177)
+    sprite_idle = (length,0,length,177)
+    sprite_idle = (2*length,0,length,177)
+    sprite_idle = (3*length,0,length,177)
+    sprite_idle = (0,0,length,177)
+    sprite_idle = (0,0,length,177)
+    sprite_idle = (3*length,0,length,177)
+    sprite_move = (20,20,100,100)
+    def __init__(self):
+        self.size = 15
+        self.position = (constants.LENGTH//2 - self.size - 5, 0)
+
+        self.img = pygame.image.load('images/wolf.jpg')
+        dimensions = self.img.get_size()
+        self.sprite = {}
+        self.sprites = []
+
+        for j in range(0,dimensions[1],dimensions[1]//4):
+            for i in range(0,dimensions[0],dimensions[0]//4):
+                rect = (i,j,dimensions[0]//4,dimensions[1]//4)
+                sprite = self.img.subsurface(rect)
+                sprite = pygame.transform.scale(sprite, (self.size,self.size))
+                sprite.set_colorkey((255,255,255))
+                self.sprites.append(sprite)
+        
+        self.tick = 0
+        self.frame = 0
+        self.direction = constants.DOWN
+        self.speed = 1
+
+        self.vision = (50,50)
     
+    def Draw(self, screen):
+        screen.blit(self.sprite, self.position)
+    
+    def Update(self, maze, hero):
+        self.tick = (self.tick + 1) % 60
+        self.RotateSprite()
+        self.Move(maze, hero)
+
+    def RotateSprite(self):
+        offset = 0
+
+        self.frame = (self.tick//15) % 4
+        if self.direction == constants.UP:
+            offset = 12
+        if self.direction == constants.DOWN:
+            offset = 0
+        if self.direction == constants.RIGHT:
+            offset = 8
+        if self.direction == constants.LEFT:
+            offset = 4
+
+        self.sprite = self.sprites[self.frame + offset]
+
+    def ProcessInput(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RIGHT:
+                self.direction = constants.RIGHT
+            if event.key == pygame.K_LEFT:
+                self.direction = constants.LEFT
+            if event.key == pygame.K_UP:
+                self.direction = constants.UP
+            if event.key == pygame.K_DOWN:
+                self.direction = constants.DOWN
+            if event.key == pygame.K_ESCAPE:
+                return False
+        if event.type == pygame.KEYUP:
+            keys_pressed = pygame.key.get_pressed()
+            if keys_pressed[pygame.K_RIGHT]:
+                self.direction = constants.RIGHT
+            if keys_pressed[pygame.K_LEFT]:
+                self.direction = constants.LEFT
+            if keys_pressed[pygame.K_UP]:
+                self.direction = constants.UP
+            if keys_pressed[pygame.K_DOWN]:
+                self.direction = constants.DOWN
+        return True
+    def Move(self, maze, hero):
+        movement = (0,0)
+        if self.direction == constants.RIGHT:
+            movement = TupleAddition(movement,(self.speed,0),-self.speed, self.speed)
+        elif self.direction == constants.LEFT:
+            movement = TupleAddition(movement,(-self.speed,0),-self.speed, self.speed)
+        elif self.direction == constants.UP:
+            movement = TupleAddition(movement,(0,-self.speed),-self.speed, self.speed)
+        elif self.direction == constants.DOWN:
+            movement = TupleAddition(movement,(0,self.speed),-self.speed, self.speed)
+
+        newPosition = TupleAddition(self.position, movement)
+        if not self.ProcessColision(maze,newPosition):
+            self.position = newPosition
+
+    def ProcessColision(self, maze, newPosition):
+        result = False
+        if self.direction == constants.RIGHT:
+            for i in range(0, self.size):
+                nextPosition = TupleAddition(newPosition, (self.size, i))
+                result = self.CalculateColision(maze, nextPosition, result)
+        if self.direction == constants.LEFT:
+            for i in range(0, self.size):
+                nextPosition = TupleAddition(newPosition, (0, i))
+                result = self.CalculateColision(maze, nextPosition, result)
+        if self.direction == constants.DOWN:
+            for i in range(0, self.size):
+                nextPosition = TupleAddition(newPosition, (i, self.size))
+                result = self.CalculateColision(maze, nextPosition, result)
+        if self.direction == constants.UP:
+            for i in range(0, self.size):
+                nextPosition = TupleAddition(newPosition, (i, 0))
+                result = self.CalculateColision(maze, nextPosition, result)
+        return result
+    
+    def CalculateColision(self, maze, position, currentResult):
+        try:
+            pixel = maze.img.get_at(position)
+            return currentResult or pixel == constants.WALL
+        except:
+            return True
+    def Eats(self,hero):
+        hero_rect = pygame.Rect(hero.position, (hero.size, hero.size))
+        wolf_rect = pygame.Rect(self.position, (self.size, self.size))
+        
+        if (wolf_rect.colliderect(hero_rect)):
+            return True
+        return False
+        
 class Game:
     def __init__(self):
         self.difficulty = constants.EASY
@@ -232,6 +388,8 @@ class Game:
         self.font_size_small = 15
         self.font = pygame.font.Font(None, self.font_size)
         self.font_small = pygame.font.Font(None, self.font_size_small)
+        self.wolf_time = 5
+        self.wolf = False
 
     def GetTimer(self, currentTimer):
         return '{:.2f}'.format(currentTimer - self.timerValue)
@@ -290,6 +448,7 @@ class Game:
         self.timerValue = None
         self.finalTimerValue = None
         self.ranking = self.loadRanking()
+        self.wolf = False
 
     def loadRanking(self):
         try:
@@ -318,6 +477,7 @@ def game_loop():
 
     game = Game()
     hero = None
+    wolf = None
     maze = None
     
     running = True
@@ -335,10 +495,11 @@ def game_loop():
             x_pos = (constants.LENGTH - text_width) // 2
             y_pos = (constants.LENGTH - text_height) // 2
             maze = None
+            wolf = None
             hero = None
             game.StartGame()
 
-            image.fill(constants.WHITE)
+            image.fill(constants.LIGHT_GREEN)
             image.blit(text_surface, (x_pos, y_pos))
 
         elif game.state == constants.MENU:
@@ -399,7 +560,7 @@ def game_loop():
             if game.selection == constants.RANKING:
                 arrow_pos = TupleAddition(ranking_pos, (0,-ranking_height//6))
             
-            image.fill(constants.WHITE)
+            image.fill(constants.LIGHT_GREEN)
             image.blit(easy_text, easy_pos)
             image.blit(normal_text, normal_pos)
             image.blit(hard_text, hard_pos)
@@ -420,7 +581,7 @@ def game_loop():
                 normalColumn = constants.RESOLUTION[1]//2 - ranking_normal.get_size()[0]//2
                 hardColumn = constants.RESOLUTION[1] - ranking_hard.get_size()[0] - 16
                               
-                image.fill(constants.WHITE)
+                image.fill(constants.LIGHT_GREEN)
                 image.blit(ranking_easy, (easyColumn,16))
                 image.blit(ranking_normal, (normalColumn, 16))
                 image.blit(ranking_hard, (hardColumn, 16))
@@ -449,14 +610,24 @@ def game_loop():
                     game.timerValue = time.time()
 
                 hero.Update(maze)
+                if game.wolf:
+                    wolf.Update(maze, hero)
+                    if wolf.Eats(hero):
+                        game.state = constants.LOSE
                 
-                maze.Draw(image, game, hero)
+                maze.Draw(image, game, hero, wolf)
                 hero.Draw(image)
+
 
                 if game.difficulty == constants.HARD:
                     visionPosition = TupleAddition(hero.position,TupleNegative(TupleDivideBy2(hero.vision)), 0, constants.LENGTH - hero.vision[0])
                     visionImage = image.subsurface((visionPosition, hero.vision))
                     image = pygame.transform.scale(visionImage, constants.RESOLUTION)
+
+                if float(game.GetTimer(time.time())) > game.wolf_time :
+                    if wolf == None:
+                        wolf = Wolf()
+                        game.wolf = True
 
                 timerSurface = game.font.render(str(game.GetTimer(time.time())), True, constants.BLUE)
                 timer_pos = (16, 16)
@@ -480,12 +651,23 @@ def game_loop():
             geplayerNamePos = ((constants.RESOLUTION[1]//2 - getplayerNameSurface.get_size()[0]//2, finalTimerPos[1] + finalTimer.get_size()[1] + spacing))
             playerNamePos = ((constants.RESOLUTION[1]//2 - playerNameSurface.get_size()[0]//2, geplayerNamePos[1] + getplayerNameSurface.get_size()[1]))
 
-            image.fill(constants.WHITE)
+            image.fill(constants.LIGHT_GREEN)
             image.blit(congrats, congratsPos)
             image.blit(finalTimer, finalTimerPos)
             image.blit(getplayerNameSurface, geplayerNamePos)
             image.blit(playerNameSurface, playerNamePos)
 
+        elif game.state == constants.LOSE:
+            if game.finalTimerValue:
+                game.updateRanking()
+
+            text_surface = game.font.render("THE WOLF EAT YOU!", True, constants.BLACK)
+            text_width, text_height = text_surface.get_size()
+            x_pos = (constants.LENGTH - text_width) // 2
+            y_pos = (constants.LENGTH - text_height) // 2
+
+            image.fill(constants.LIGHT_GREEN)
+            image.blit(text_surface, (x_pos, y_pos))
         screen.blit(image, constants.ORIGIN)
         pygame.display.update()
                 
@@ -495,6 +677,8 @@ def game_loop():
             if hero != None:
                 if not hero.ProcessInput(event):
                     game.state = constants.LOADING
+            if wolf != None:
+                wolf.ProcessInput(event)
             game.ProcessInput(event)
 
     pygame.quit()

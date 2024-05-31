@@ -9,6 +9,8 @@ BLUE = (0,0,255)
 GREEN = (0,255,0)
 BLACK = (0,0,0)
 WHITE = (255,255,255)
+LIGHT_GREEN = (90,238,90)
+DARK_GREEN = (1,50,32)
 
 # hero values
 IDLE = 0
@@ -42,3 +44,4 @@ LOADING = 0
 MENU = 1
 RUNNING = 2
 WIN = 3
+LOSE = 4
