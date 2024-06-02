@@ -2,11 +2,14 @@ import constants
 import pygame
 import time
 import json
+import random
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+OS = constants.WINDOWS
 
 def TupleAddition(A, B, lowerbound = 0, upperbound = constants.LENGTH):
     result = tuple(map(lambda i, j: i + j, A, B))
@@ -47,7 +50,7 @@ class Maze:
             svg = driver.find_element(By.TAG_NAME, "svg")
             driver.save_screenshot("./images/maze.png")
             self.img = pygame.image.load("./images/maze.png")
-            self.img = self.img.subsurface((0, 0, 2*svg.size["width"], 2*svg.size["height"]))
+            self.img = self.img.subsurface((0, 0, OS*svg.size["width"], OS*svg.size["height"]))
             self.img = pygame.transform.scale(self.img, constants.RESOLUTION)
         finally:
             driver.close()
@@ -98,7 +101,6 @@ class Maze:
         else:
             image.blit(maze_with_wolf, constants.ORIGIN)
 
-
 class Hero:
     length = 118
     sprite_idle = (0,0,length,177)
@@ -132,7 +134,7 @@ class Hero:
         self.moving = False
         self.speed = 1
 
-        self.vision = (50,50)
+        self.vision = (100,100)
     
     def Draw(self, screen):
         screen.blit(self.sprite, self.position)
@@ -257,7 +259,7 @@ class Wolf:
     sprite_move = (20,20,100,100)
     def __init__(self):
         self.size = 15
-        self.position = (constants.LENGTH//2 - self.size - 5, 0)
+        self.position = (random.randint(0, constants.LENGTH),random.randint(0, constants.LENGTH))
 
         self.img = pygame.image.load('images/wolf.jpg')
         dimensions = self.img.get_size()
@@ -302,29 +304,6 @@ class Wolf:
 
         self.sprite = self.sprites[self.frame + offset]
 
-    def ProcessInput(self, event):
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_RIGHT:
-                self.direction = constants.RIGHT
-            if event.key == pygame.K_LEFT:
-                self.direction = constants.LEFT
-            if event.key == pygame.K_UP:
-                self.direction = constants.UP
-            if event.key == pygame.K_DOWN:
-                self.direction = constants.DOWN
-            if event.key == pygame.K_ESCAPE:
-                return False
-        if event.type == pygame.KEYUP:
-            keys_pressed = pygame.key.get_pressed()
-            if keys_pressed[pygame.K_RIGHT]:
-                self.direction = constants.RIGHT
-            if keys_pressed[pygame.K_LEFT]:
-                self.direction = constants.LEFT
-            if keys_pressed[pygame.K_UP]:
-                self.direction = constants.UP
-            if keys_pressed[pygame.K_DOWN]:
-                self.direction = constants.DOWN
-        return True
     def Move(self, maze, hero):
         movement = (0,0)
         if self.direction == constants.RIGHT:
@@ -339,6 +318,9 @@ class Wolf:
         newPosition = TupleAddition(self.position, movement)
         if not self.ProcessColision(maze,newPosition):
             self.position = newPosition
+        else:
+            directions = [constants.UP, constants.DOWN, constants.LEFT, constants.RIGHT]
+            self.direction = random.choice(directions)
 
     def ProcessColision(self, maze, newPosition):
         result = False
@@ -425,6 +407,13 @@ class Game:
             if event.key == pygame.K_RETURN:
                 self.difficulty = self.selection
                 self.state = constants.RUNNING
+                if self.difficulty == constants.EASY:
+                    self.wolf_time = 30
+                if self.difficulty == constants.NORMAL:
+                    self.wolf_time = 20
+                if self.difficulty == constants.HARD:
+                    self.wolf_time = 10
+                    
 
     def ProcessEndgameInput(self, event) -> bool:
         if event.type == pygame.KEYDOWN:
@@ -661,7 +650,7 @@ def game_loop():
             if game.finalTimerValue:
                 game.updateRanking()
 
-            text_surface = game.font.render("THE WOLF EAT YOU!", True, constants.BLACK)
+            text_surface = game.font.render("THE WOLF ATE YOU!", True, constants.BLACK)
             text_width, text_height = text_surface.get_size()
             x_pos = (constants.LENGTH - text_width) // 2
             y_pos = (constants.LENGTH - text_height) // 2
@@ -677,8 +666,6 @@ def game_loop():
             if hero != None:
                 if not hero.ProcessInput(event):
                     game.state = constants.LOADING
-            if wolf != None:
-                wolf.ProcessInput(event)
             game.ProcessInput(event)
 
     pygame.quit()

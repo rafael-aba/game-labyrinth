@@ -45,3 +45,7 @@ MENU = 1
 RUNNING = 2
 WIN = 3
 LOSE = 4
+
+# OS
+WINDOWS = 1
+MACOS = 2
